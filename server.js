@@ -6,7 +6,10 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*' },
+  pingInterval: 30000,
+  pingTimeout: 120000,
+  connectTimeout: 60000
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -175,6 +178,7 @@ io.on('connection', (socket) => {
     socket.join(code);
     socket.roomCode = code;
     socket.playerColor = 'w';
+    socket.playerName = data.name;
     socket.emit('roomCreated', { code, color: 'w' });
     console.log(`Room ${code} created by ${data.name}`);
   });
@@ -194,6 +198,7 @@ io.on('connection', (socket) => {
     socket.join(data.code);
     socket.roomCode = data.code;
     socket.playerColor = 'b';
+    socket.playerName = data.name;
 
     const p1 = room.players[0];
     const p2 = room.players[1];
@@ -334,21 +339,70 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('rejoinRoom', (data) => {
+    const room = rooms[data.code];
+    if (!room) {
+      socket.emit('error', { message: 'Oda bulunamadi!' });
+      return;
+    }
+
+    // Find the player slot by name and color
+    const playerSlot = room.players.find(p => p.name === data.name && p.color === data.color);
+    if (playerSlot) {
+      // Clear any pending disconnect timer
+      if (playerSlot.disconnectTimer) {
+        clearTimeout(playerSlot.disconnectTimer);
+        playerSlot.disconnectTimer = null;
+      }
+      playerSlot.id = socket.id;
+      playerSlot.disconnected = false;
+      socket.join(data.code);
+      socket.roomCode = data.code;
+      socket.playerColor = data.color;
+      socket.playerName = data.name;
+
+      const wPlayer = room.players.find(p => p.color === 'w');
+      const bPlayer = room.players.find(p => p.color === 'b');
+
+      socket.emit('rejoinSuccess', {
+        state: room.state,
+        color: data.color,
+        whiteName: wPlayer ? wPlayer.name : '?',
+        blackName: bPlayer ? bPlayer.name : '?'
+      });
+
+      // Notify opponent that player is back
+      socket.to(data.code).emit('opponentReconnected');
+      console.log(`${data.name} rejoined room ${data.code}`);
+    } else {
+      socket.emit('error', { message: 'Odada yerin bulunamadi!' });
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Disconnected:', socket.id);
     if (socket.roomCode && rooms[socket.roomCode]) {
-      io.to(socket.roomCode).emit('opponentLeft');
-      // Clean up room after a delay
-      setTimeout(() => {
-        if (rooms[socket.roomCode]) {
-          const room = rooms[socket.roomCode];
-          room.players = room.players.filter(p => p.id !== socket.id);
-          if (room.players.length === 0) {
-            delete rooms[socket.roomCode];
-            console.log(`Room ${socket.roomCode} deleted`);
+      const room = rooms[socket.roomCode];
+      const player = room.players.find(p => p.id === socket.id);
+      
+      if (player) {
+        player.disconnected = true;
+        
+        // Notify opponent about temporary disconnect
+        socket.to(socket.roomCode).emit('opponentTemporaryDisconnect');
+
+        // Give 2 minutes grace period before removing player
+        player.disconnectTimer = setTimeout(() => {
+          if (player.disconnected) {
+            io.to(socket.roomCode).emit('opponentLeft');
+            room.players = room.players.filter(p => p.id !== socket.id);
+            if (room.players.length === 0) {
+              delete rooms[socket.roomCode];
+              console.log(`Room ${socket.roomCode} deleted`);
+            }
           }
-        }
-      }, 5000);
+        }, 120000); // 2 minutes
+      }
     }
   });
 });

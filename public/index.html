@@ -159,13 +159,20 @@ canvas#boardCanvas{display:block;width:100%;border-radius:4px}
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-var socket = io();
+var socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 120000
+});
 var myColor = null;
 var myName = '';
 var opponentName = '';
 var whiteName = '';
 var blackName = '';
 var roomCode = '';
+var inGame = false;
 
 // Game state (synced from server)
 var board, turn, dice, usedDice, barWhite, barBlack, offW, offB, gameOver;
@@ -333,9 +340,35 @@ socket.on('opponentLeft', function() {
   document.getElementById('disconnectOverlay').classList.add('active');
 });
 
+socket.on('opponentTemporaryDisconnect', function() {
+  msg('Rakibin baglantisi gecici olarak kesildi. Bekleniyor...');
+});
+
+socket.on('opponentReconnected', function() {
+  if (turn === myColor) msg('Rakibin geri baglandi! Senin siran.');
+  else msg('Rakibin geri baglandi! Sirayi bekle...');
+});
+
 socket.on('disconnect', function() {
-  document.getElementById('gameOverOverlay').classList.remove('active');
-  document.getElementById('disconnectOverlay').classList.add('active');
+  if (inGame) {
+    msg('Baglanti kesildi. Yeniden baglaniliyor...');
+  }
+});
+
+socket.on('connect', function() {
+  if (inGame && roomCode && myColor && myName) {
+    socket.emit('rejoinRoom', { code: roomCode, name: myName, color: myColor });
+  }
+});
+
+socket.on('rejoinSuccess', function(data) {
+  whiteName = data.whiteName;
+  blackName = data.blackName;
+  myColor = data.color;
+  syncState(data.state);
+  startGameUI();
+  if (turn === myColor) msg('Yeniden baglandin! Senin siran.');
+  else msg('Yeniden baglandin! Sirayi bekle...');
 });
 
 // ---- GAME UI ----
@@ -353,6 +386,7 @@ function syncState(s) {
 }
 
 function startGameUI() {
+  inGame = true;
   showScreen('gameScreen');
   document.getElementById('whiteNameLabel').textContent = whiteName;
   document.getElementById('blackNameLabel').textContent = blackName;
@@ -388,16 +422,22 @@ function doEndTurn() { socket.emit('endTurn'); selectedPoint = -1; }
 function doRematch() { socket.emit('rematch'); }
 
 function backToLobby() {
+  inGame = false;
   document.getElementById('gameOverOverlay').classList.remove('active');
   document.getElementById('disconnectOverlay').classList.remove('active');
   socket.disconnect();
-  socket = io();
+  socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 120000
+  });
   setupSocketListeners();
   showScreen('lobbyScreen');
 }
 
 function setupSocketListeners() {
-  // Re-attach all listeners (they were lost on disconnect/reconnect)
   socket.on('roomCreated', function(data) { roomCode=data.code;myColor=data.color;document.getElementById('roomCodeDisplay').textContent=data.code;showScreen('waitingScreen'); });
   socket.on('roomJoined', function(data) { roomCode=data.code;myColor=data.color;opponentName=data.opponentName; });
   socket.on('opponentJoined', function(data) { opponentName=data.opponentName; });
@@ -413,7 +453,11 @@ function setupSocketListeners() {
   socket.on('rematchStarted', function(data) { whiteName=data.whiteName;blackName=data.blackName;syncState(data.state);document.getElementById('gameOverOverlay').classList.remove('active');startGameUI(); });
   socket.on('colorAssigned', function(data) { myColor=data.color; });
   socket.on('opponentLeft', function() { document.getElementById('gameOverOverlay').classList.remove('active');document.getElementById('disconnectOverlay').classList.add('active'); });
-  socket.on('disconnect', function() { document.getElementById('gameOverOverlay').classList.remove('active');document.getElementById('disconnectOverlay').classList.add('active'); });
+  socket.on('opponentTemporaryDisconnect', function() { msg('Rakibin baglantisi gecici olarak kesildi...'); });
+  socket.on('opponentReconnected', function() { if(turn===myColor)msg('Rakibin geri baglandi! Senin siran.');else msg('Rakibin geri baglandi!'); });
+  socket.on('disconnect', function() { if(inGame)msg('Baglanti kesildi. Yeniden baglaniliyor...'); });
+  socket.on('connect', function() { if(inGame&&roomCode&&myColor&&myName)socket.emit('rejoinRoom',{code:roomCode,name:myName,color:myColor}); });
+  socket.on('rejoinSuccess', function(data) { whiteName=data.whiteName;blackName=data.blackName;myColor=data.color;syncState(data.state);startGameUI();if(turn===myColor)msg('Yeniden baglandin! Senin siran.');else msg('Yeniden baglandin!'); });
 }
 
 // ---- CLIENT-SIDE GAME LOGIC (for UI validation/display) ----
