@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tavla Online</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:#1a1410;font-family:'DM Sans',sans-serif;height:100%;height:100dvh;color:#f5e6d0;overflow-x:hidden;touch-action:manipulation}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh}
+
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%;padding:20px}
+.screen.active{display:flex}
+
+h1{font-family:'Playfair Display',serif;font-size:clamp(28px,7vw,42px);color:#e8c87a;text-shadow:0 2px 12px rgba(0,0,0,0.5);letter-spacing:3px}
+.subtitle{color:#a89070;font-size:clamp(13px,3.5vw,16px);text-align:center}
+
+.input-field{background:rgba(255,255,255,0.08);border:1.5px solid rgba(232,200,122,0.3);border-radius:10px;padding:12px 16px;font-size:clamp(15px,4vw,18px);color:#f5e6d0;font-family:'DM Sans',sans-serif;width:min(280px,80vw);text-align:center;outline:none;transition:border-color 0.2s}
+.input-field:focus{border-color:#e8c87a}
+.input-field::placeholder{color:rgba(168,144,112,0.6)}
+
+.big-btn{padding:14px 36px;border-radius:10px;border:2px solid #e8c87a;background:rgba(232,200,122,0.12);color:#e8c87a;font-family:'DM Sans',sans-serif;font-size:clamp(14px,3.5vw,17px);font-weight:700;cursor:pointer;letter-spacing:1px;transition:all 0.2s;width:min(280px,80vw)}
+.big-btn:active{background:rgba(232,200,122,0.25);transform:scale(0.97)}
+.big-btn.secondary{border-color:#6b4a2a;background:rgba(255,255,255,0.04);color:#a89070;font-weight:600}
+
+.room-code-display{font-family:'Playfair Display',serif;font-size:clamp(36px,10vw,56px);color:#e8c87a;letter-spacing:12px;text-shadow:0 2px 12px rgba(232,200,122,0.3)}
+.waiting-text{color:#a89070;font-size:clamp(13px,3.2vw,15px);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.or-divider{display:flex;align-items:center;gap:12px;width:min(280px,80vw);color:#6b4a2a;font-size:13px}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:#6b4a2a}
+
+.error-msg{color:#e85a5a;font-size:13px;min-height:18px;text-align:center}
+
+/* GAME */
+#gameScreen{gap:5px;padding:6px 4px}
+.game-title{font-family:'Playfair Display',serif;font-size:clamp(16px,4.5vw,24px);text-align:center;color:#e8c87a;letter-spacing:2px}
+.players-bar{display:flex;justify-content:space-between;width:100%;max-width:720px;font-size:clamp(11px,2.8vw,14px);gap:6px}
+.player-info{display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(232,200,122,0.15);flex:1;min-width:0}
+.player-info.active{background:rgba(232,200,122,0.12);border-color:rgba(232,200,122,0.5);box-shadow:0 0 8px rgba(232,200,122,0.15)}
+.player-info.you .player-name::after{content:" (sen)";color:#a89070;font-size:0.85em}
+.player-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dot-white{background:#f5e6d0;border:1px solid #c4a060}
+.dot-black{background:#2c2218;border:1px solid #8b7355}
+.player-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pip-count{font-size:clamp(9px,2.2vw,12px);color:#a89070;margin-left:auto;white-space:nowrap}
+
+.board-wrapper{position:relative;background:linear-gradient(135deg,#5c3a1e,#4a2e15,#3d2510);border-radius:10px;padding:clamp(5px,1.5vw,12px);box-shadow:0 4px 20px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.08);border:2px solid #6b4a2a;width:100%;max-width:720px}
+.board-inner{display:flex}
+.board-canvas-wrap{flex:1;min-width:0;position:relative}
+canvas#boardCanvas{display:block;width:100%;border-radius:4px}
+
+.bearoff-zone{flex:0 0 auto;width:clamp(22px,5.5vw,44px);background:linear-gradient(180deg,#4a2e15,#3d2510);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0;border-left:2px solid #5c3a1e;border-radius:0 6px 6px 0;cursor:pointer}
+.bearoff-label{font-size:clamp(6px,1.5vw,9px);color:#a89070;writing-mode:vertical-rl;letter-spacing:1px}
+.bearoff-count{font-size:clamp(12px,3.5vw,18px);font-weight:700;color:#e8c87a}
+
+.controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;width:100%;max-width:720px}
+.dice-area{display:flex;gap:6px;align-items:center}
+.die{width:clamp(36px,9vw,48px);height:clamp(36px,9vw,48px);background:linear-gradient(135deg,#fff,#f0e0c8);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,4.5vw,22px);font-weight:700;color:#2c1810;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:1px solid #c4a060}
+.die.used{opacity:0.35}
+.die.rolling{animation:rollDie 0.4s ease-out}
+@keyframes rollDie{0%{transform:rotateZ(0) scale(0.8)}50%{transform:rotateZ(180deg) scale(1.1)}100%{transform:rotateZ(360deg) scale(1)}}
+
+.btn{padding:8px 12px;border-radius:8px;border:1px solid #6b4a2a;background:linear-gradient(135deg,#5c3a1e,#4a2e15);color:#e8c87a;font-family:'DM Sans',sans-serif;font-size:clamp(11px,2.8vw,14px);font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:active{background:linear-gradient(135deg,#6b4a2a,#5c3a1e)}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+.message{font-size:clamp(12px,3vw,14px);color:#e8c87a;text-align:center;min-height:18px;font-weight:500;padding:0 8px}
+
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.overlay.active{display:flex}
+.overlay-box{background:linear-gradient(135deg,#3d2510,#2a1a0c);border:2px solid #6b4a2a;border-radius:14px;padding:24px;text-align:center;max-width:320px;width:100%;display:flex;flex-direction:column;gap:14px;align-items:center}
+.overlay-box h2{font-family:'Playfair Display',serif;color:#e8c87a;font-size:clamp(20px,5vw,28px)}
+.overlay-box p{color:#a89070;font-size:14px}
+
+.room-info{font-size:11px;color:#6b4a2a;position:absolute;top:2px;right:8px}
+</style>
+</head>
+<body>
+
+<!-- LOBBY SCREEN -->
+<div class="screen active" id="lobbyScreen">
+  <h1>TAVLA</h1>
+  <p class="subtitle">Online karsilikli oyna</p>
+  <input type="text" class="input-field" id="nameInput" placeholder="Adini gir..." maxlength="15" autocomplete="off">
+  <button class="big-btn" onclick="createRoom()">ODA OLUSTUR</button>
+  <div class="or-divider">veya</div>
+  <input type="text" class="input-field" id="codeInput" placeholder="Oda kodu gir..." maxlength="4" autocomplete="off" inputmode="numeric" style="letter-spacing:8px;font-weight:700">
+  <button class="big-btn secondary" onclick="joinRoom()">ODAYA KATIL</button>
+  <div class="error-msg" id="errorMsg"></div>
+</div>
+
+<!-- WAITING SCREEN -->
+<div class="screen" id="waitingScreen">
+  <h1>TAVLA</h1>
+  <p class="subtitle">Oda kodunu arkadasinla paylas:</p>
+  <div class="room-code-display" id="roomCodeDisplay"></div>
+  <p class="waiting-text">Rakip bekleniyor...</p>
+  <button class="big-btn secondary" onclick="copyCode()" id="copyBtn">KODU KOPYALA</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div class="screen" id="gameScreen" style="justify-content:center">
+  <div style="position:relative;width:100%;max-width:720px">
+    <div class="game-title">TAVLA <span class="room-info" id="roomInfo"></span></div>
+  </div>
+  <div class="players-bar">
+    <div class="player-info" id="p-white">
+      <div class="player-dot dot-white"></div>
+      <span class="player-name" id="whiteNameLabel">Beyaz</span>
+      <span class="pip-count" id="pip-white"></span>
+    </div>
+    <div class="player-info" id="p-black">
+      <div class="player-dot dot-black"></div>
+      <span class="player-name" id="blackNameLabel">Siyah</span>
+      <span class="pip-count" id="pip-black"></span>
+    </div>
+  </div>
+  <div class="board-wrapper">
+    <div class="board-inner">
+      <div class="board-canvas-wrap"><canvas id="boardCanvas"></canvas></div>
+      <div class="bearoff-zone" onclick="clickBearoff()">
+        <div style="text-align:center"><div class="bearoff-count" id="bo-black">0</div><div class="bearoff-label">SIYAH</div></div>
+        <div style="text-align:center"><div class="bearoff-count" id="bo-white">0</div><div class="bearoff-label">BEYAZ</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="dice-area">
+      <div class="die" id="die1">?</div>
+      <div class="die" id="die2">?</div>
+    </div>
+    <button class="btn" id="rollBtn" onclick="doRoll()">Zar At</button>
+    <button class="btn" id="undoBtn" onclick="doUndo()" disabled>Geri Al</button>
+    <button class="btn" id="endBtn" onclick="doEndTurn()" disabled>Sira Ver</button>
+  </div>
+  <div class="message" id="msg"></div>
+</div>
+
+<!-- GAME OVER OVERLAY -->
+<div class="overlay" id="gameOverOverlay">
+  <div class="overlay-box">
+    <h2 id="winnerText"></h2>
+    <p id="winnerSub"></p>
+    <button class="big-btn" onclick="doRematch()">TEKRAR OYNA</button>
+    <button class="big-btn secondary" onclick="backToLobby()">LOBIYE DON</button>
+  </div>
+</div>
+
+<!-- DISCONNECT OVERLAY -->
+<div class="overlay" id="disconnectOverlay">
+  <div class="overlay-box">
+    <h2>Baglanti Kesildi</h2>
+    <p>Rakibin ayrildi veya baglanti koptu.</p>
+    <button class="big-btn" onclick="backToLobby()">LOBIYE DON</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+var socket = io();
+var myColor = null;
+var myName = '';
+var opponentName = '';
+var whiteName = '';
+var blackName = '';
+var roomCode = '';
+
+// Game state (synced from server)
+var board, turn, dice, usedDice, barWhite, barBlack, offW, offB, gameOver;
+var selectedPoint = -1;
+
+// Canvas
+var canvas, ctx, CW, CH, POINT_W, ROW_H, BAR_W, PIECE_R, BOARD_PAD;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+// ---- LOBBY ----
+
+function createRoom() {
+  myName = document.getElementById('nameInput').value.trim() || 'Oyuncu';
+  socket.emit('createRoom', { name: myName });
+}
+
+function joinRoom() {
+  myName = document.getElementById('nameInput').value.trim() || 'Oyuncu';
+  var code = document.getElementById('codeInput').value.trim();
+  if (code.length !== 4) {
+    document.getElementById('errorMsg').textContent = '4 haneli oda kodu gir!';
+    return;
+  }
+  socket.emit('joinRoom', { name: myName, code: code });
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(roomCode).then(function() {
+    document.getElementById('copyBtn').textContent = 'KOPYALANDI!';
+    setTimeout(function() { document.getElementById('copyBtn').textContent = 'KODU KOPYALA'; }, 2000);
+  }).catch(function() {});
+}
+
+document.getElementById('codeInput').addEventListener('input', function(e) {
+  this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+// ---- SOCKET EVENTS ----
+
+socket.on('roomCreated', function(data) {
+  roomCode = data.code;
+  myColor = data.color;
+  document.getElementById('roomCodeDisplay').textContent = data.code;
+  showScreen('waitingScreen');
+});
+
+socket.on('roomJoined', function(data) {
+  roomCode = data.code;
+  myColor = data.color;
+  opponentName = data.opponentName;
+});
+
+socket.on('opponentJoined', function(data) {
+  opponentName = data.opponentName;
+});
+
+socket.on('error', function(data) {
+  document.getElementById('errorMsg').textContent = data.message;
+});
+
+socket.on('gameStart', function(data) {
+  whiteName = data.whiteName;
+  blackName = data.blackName;
+  syncState(data.state);
+  startGameUI();
+});
+
+socket.on('diceRolled', function(data) {
+  syncState(data.state);
+  var el1 = document.getElementById('die1');
+  var el2 = document.getElementById('die2');
+  el1.textContent = data.d1; el2.textContent = data.d2;
+  el1.classList.remove('used'); el2.classList.remove('used');
+  el1.classList.add('rolling'); el2.classList.add('rolling');
+  setTimeout(function() { el1.classList.remove('rolling'); el2.classList.remove('rolling'); }, 400);
+
+  var rollerName = data.roller === 'w' ? whiteName : blackName;
+  if (data.roller === myColor) {
+    msg(rollerName + ' ' + data.d1 + '-' + data.d2 + ' atti. Tasini sec!');
+  } else {
+    msg(rollerName + ' ' + data.d1 + '-' + data.d2 + ' atti. Sirayi bekle...');
+  }
+  updateControls();
+  render();
+});
+
+socket.on('moveMade', function(data) {
+  syncState(data.state);
+  selectedPoint = -1;
+  updateControls();
+  render();
+  if (turn === myColor && !gameOver) {
+    var left = getAvailableDice();
+    if (left.length > 0 && hasAnyMoveLocal(myColor)) {
+      msg('Kalan zar: ' + left.join(', ') + '. Tasini sec!');
+    } else if (left.length > 0) {
+      msg('Yapabilecegin hamle yok. Sirayi ver.');
+    } else {
+      msg('Hamlelerin bitti. Sirayi ver.');
+    }
+  }
+});
+
+socket.on('moveUndone', function(data) {
+  syncState(data.state);
+  selectedPoint = -1;
+  updateControls();
+  render();
+});
+
+socket.on('noMoves', function(data) {
+  if (data.player === myColor) {
+    msg('Yapabilecegin hamle yok. Sirayi ver.');
+  }
+});
+
+socket.on('turnChanged', function(data) {
+  syncState(data.state);
+  selectedPoint = -1;
+  document.getElementById('die1').textContent = '?';
+  document.getElementById('die2').textContent = '?';
+  document.getElementById('die1').classList.remove('used');
+  document.getElementById('die2').classList.remove('used');
+
+  if (turn === myColor) {
+    msg('Senin siran! Zar at.');
+  } else {
+    var oName = myColor === 'w' ? blackName : whiteName;
+    msg(oName + '\'in sirasi...');
+  }
+  updateControls();
+  render();
+});
+
+socket.on('invalidMove', function() {
+  msg('Gecersiz hamle!');
+});
+
+socket.on('gameOver', function(data) {
+  gameOver = true;
+  var winnerN = data.winner === 'w' ? whiteName : blackName;
+  document.getElementById('winnerText').textContent = winnerN + ' Kazandi!';
+  document.getElementById('winnerSub').textContent = data.winner === myColor ? 'Tebrikler!' : 'Bir dahaki sefere!';
+  document.getElementById('gameOverOverlay').classList.add('active');
+});
+
+socket.on('rematchStarted', function(data) {
+  whiteName = data.whiteName;
+  blackName = data.blackName;
+  syncState(data.state);
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  startGameUI();
+});
+
+socket.on('colorAssigned', function(data) {
+  myColor = data.color;
+});
+
+socket.on('opponentLeft', function() {
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('disconnectOverlay').classList.add('active');
+});
+
+socket.on('disconnect', function() {
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('disconnectOverlay').classList.add('active');
+});
+
+// ---- GAME UI ----
+
+function syncState(s) {
+  board = s.board.map(function(p) { return {w:p.w, b:p.b}; });
+  turn = s.turn;
+  dice = s.dice.slice();
+  usedDice = s.usedDice.slice();
+  barWhite = s.barWhite;
+  barBlack = s.barBlack;
+  offW = s.offW;
+  offB = s.offB;
+  gameOver = s.gameOver || false;
+}
+
+function startGameUI() {
+  showScreen('gameScreen');
+  document.getElementById('whiteNameLabel').textContent = whiteName;
+  document.getElementById('blackNameLabel').textContent = blackName;
+  document.getElementById('roomInfo').textContent = 'Oda: ' + roomCode;
+
+  // Mark "you"
+  var wInfo = document.getElementById('p-white');
+  var bInfo = document.getElementById('p-black');
+  wInfo.classList.toggle('you', myColor === 'w');
+  bInfo.classList.toggle('you', myColor === 'b');
+
+  selectedPoint = -1;
+  initCanvas();
+  canvas.onclick = handleCanvasClick;
+  updateControls();
+  render();
+
+  if (turn === myColor) msg('Senin siran! Zar at.');
+  else msg('Rakibin sirasi...');
+}
+
+function updateControls() {
+  var isMyTurn = turn === myColor && !gameOver;
+  var left = getAvailableDice();
+  document.getElementById('rollBtn').disabled = !(isMyTurn && (dice.length === 0 || left.length === 0));
+  document.getElementById('endBtn').disabled = !(isMyTurn && dice.length > 0);
+  document.getElementById('undoBtn').disabled = !(isMyTurn && dice.length > 0);
+}
+
+function doRoll() { socket.emit('rollDice'); }
+function doUndo() { socket.emit('undoMove'); selectedPoint = -1; }
+function doEndTurn() { socket.emit('endTurn'); selectedPoint = -1; }
+function doRematch() { socket.emit('rematch'); }
+
+function backToLobby() {
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('disconnectOverlay').classList.remove('active');
+  socket.disconnect();
+  socket = io();
+  setupSocketListeners();
+  showScreen('lobbyScreen');
+}
+
+function setupSocketListeners() {
+  // Re-attach all listeners (they were lost on disconnect/reconnect)
+  socket.on('roomCreated', function(data) { roomCode=data.code;myColor=data.color;document.getElementById('roomCodeDisplay').textContent=data.code;showScreen('waitingScreen'); });
+  socket.on('roomJoined', function(data) { roomCode=data.code;myColor=data.color;opponentName=data.opponentName; });
+  socket.on('opponentJoined', function(data) { opponentName=data.opponentName; });
+  socket.on('error', function(data) { document.getElementById('errorMsg').textContent=data.message; });
+  socket.on('gameStart', function(data) { whiteName=data.whiteName;blackName=data.blackName;syncState(data.state);startGameUI(); });
+  socket.on('diceRolled', function(data) { syncState(data.state);var el1=document.getElementById('die1');var el2=document.getElementById('die2');el1.textContent=data.d1;el2.textContent=data.d2;el1.classList.remove('used');el2.classList.remove('used');el1.classList.add('rolling');el2.classList.add('rolling');setTimeout(function(){el1.classList.remove('rolling');el2.classList.remove('rolling');},400);var rn=data.roller==='w'?whiteName:blackName;if(data.roller===myColor)msg(rn+' '+data.d1+'-'+data.d2+' atti. Tasini sec!');else msg(rn+' '+data.d1+'-'+data.d2+' atti. Sirayi bekle...');updateControls();render(); });
+  socket.on('moveMade', function(data) { syncState(data.state);selectedPoint=-1;updateControls();render();if(turn===myColor&&!gameOver){var left=getAvailableDice();if(left.length>0&&hasAnyMoveLocal(myColor))msg('Kalan zar: '+left.join(', ')+'. Tasini sec!');else if(left.length>0)msg('Yapabilecegin hamle yok. Sirayi ver.');else msg('Hamlelerin bitti. Sirayi ver.');} });
+  socket.on('moveUndone', function(data) { syncState(data.state);selectedPoint=-1;updateControls();render(); });
+  socket.on('noMoves', function(data) { if(data.player===myColor)msg('Yapabilecegin hamle yok. Sirayi ver.'); });
+  socket.on('turnChanged', function(data) { syncState(data.state);selectedPoint=-1;document.getElementById('die1').textContent='?';document.getElementById('die2').textContent='?';document.getElementById('die1').classList.remove('used');document.getElementById('die2').classList.remove('used');if(turn===myColor)msg('Senin siran! Zar at.');else{var oN=myColor==='w'?blackName:whiteName;msg(oN+'\'in sirasi...');}updateControls();render(); });
+  socket.on('invalidMove', function() { msg('Gecersiz hamle!'); });
+  socket.on('gameOver', function(data) { gameOver=true;var wN=data.winner==='w'?whiteName:blackName;document.getElementById('winnerText').textContent=wN+' Kazandi!';document.getElementById('winnerSub').textContent=data.winner===myColor?'Tebrikler!':'Bir dahaki sefere!';document.getElementById('gameOverOverlay').classList.add('active'); });
+  socket.on('rematchStarted', function(data) { whiteName=data.whiteName;blackName=data.blackName;syncState(data.state);document.getElementById('gameOverOverlay').classList.remove('active');startGameUI(); });
+  socket.on('colorAssigned', function(data) { myColor=data.color; });
+  socket.on('opponentLeft', function() { document.getElementById('gameOverOverlay').classList.remove('active');document.getElementById('disconnectOverlay').classList.add('active'); });
+  socket.on('disconnect', function() { document.getElementById('gameOverOverlay').classList.remove('active');document.getElementById('disconnectOverlay').classList.add('active'); });
+}
+
+// ---- CLIENT-SIDE GAME LOGIC (for UI validation/display) ----
+
+function getAvailableDice() {
+  var a = dice.slice();
+  usedDice.forEach(function(u) { var i=a.indexOf(u); if(i>=0)a.splice(i,1); });
+  return a;
+}
+
+function canBearOff(c) {
+  var bar=c==='w'?barWhite:barBlack;if(bar>0)return false;
+  for(var i=0;i<24;i++){if(c==='w'&&i<18&&board[i].w>0)return false;if(c==='b'&&i>5&&board[i].b>0)return false;}
+  return true;
+}
+
+function isHighest(idx,c) {
+  if(c==='w'){for(var i=18;i<idx;i++){if(board[i].w>0)return false;}return true;}
+  else{for(var i=5;i>idx;i--){if(board[i].b>0)return false;}return true;}
+}
+
+function getValidMovesLocal(pi,c) {
+  var mv=[];var av=getAvailableDice();var seen={};
+  var uq=av.filter(function(d){if(seen[d])return false;seen[d]=true;return true;});
+  var opp=c==='w'?'b':'w';var dir=c==='w'?1:-1;var bar=c==='w'?barWhite:barBlack;
+  if(bar>0&&pi!==-1)return[];if(pi===-1&&bar===0)return[];
+  for(var di=0;di<uq.length;di++){
+    var d=uq[di];var to;
+    if(pi===-1){to=c==='w'?d-1:24-d;}else{to=pi+d*dir;}
+    if(to>=0&&to<24){if(board[to][opp]<=1)mv.push({from:pi,to:to,die:d,hit:board[to][opp]===1});}
+    else if(canBearOff(c)){
+      if(c==='w'&&to>=24){var hp=pi-18;if(d===hp+1||(d>hp+1&&isHighest(pi,c)))mv.push({from:pi,to:24,die:d,bearoff:true});}
+      else if(c==='b'&&to<0){var hp2=5-pi;if(d===hp2+1||(d>hp2+1&&isHighest(pi,c)))mv.push({from:pi,to:-1,die:d,bearoff:true});}
+    }
+  }
+  return mv;
+}
+
+function hasAnyMoveLocal(c) {
+  var bar=c==='w'?barWhite:barBlack;
+  if(bar>0)return getValidMovesLocal(-1,c).length>0;
+  for(var i=0;i<24;i++){if(board[i][c]>0&&getValidMovesLocal(i,c).length>0)return true;}
+  return false;
+}
+
+// ---- CANVAS DRAWING ----
+
+function initCanvas() {
+  canvas = document.getElementById('boardCanvas');
+  var wrap = canvas.parentElement;
+  var w = wrap.clientWidth;
+  var dpr = window.devicePixelRatio || 1;
+  BAR_W = Math.max(18, w * 0.05);
+  POINT_W = (w - BAR_W) / 12;
+  PIECE_R = Math.min(POINT_W * 0.42, 20);
+  ROW_H = Math.min(PIECE_R * 2 * 5.5, w * 0.32);
+  BOARD_PAD = 2;
+  CW = w;
+  CH = ROW_H * 2 + BOARD_PAD * 2 + 6;
+  canvas.width = CW * dpr;
+  canvas.height = CH * dpr;
+  canvas.style.width = CW + 'px';
+  canvas.style.height = CH + 'px';
+  ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+}
+
+var topIndices = [12,13,14,15,16,17, 18,19,20,21,22,23];
+var botIndices = [11,10,9,8,7,6, 5,4,3,2,1,0];
+
+function getPointX(vi) {
+  if (vi < 6) return POINT_W * vi + POINT_W / 2;
+  return POINT_W * 6 + BAR_W + POINT_W * (vi - 6) + POINT_W / 2;
+}
+
+function drawBoard() {
+  if (!ctx) return;
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#1b5e2e'; ctx.fillRect(0, 0, CW, CH);
+  ctx.strokeStyle = '#3a2a14'; ctx.lineWidth = 2; ctx.strokeRect(0, 0, CW, CH);
+
+  var barX = POINT_W * 6;
+  ctx.fillStyle = '#4a2e15'; ctx.fillRect(barX, 0, BAR_W, CH);
+  ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 1; ctx.strokeRect(barX, 0, BAR_W, CH);
+
+  var midY = CH / 2;
+  ctx.strokeStyle = '#3a2a14'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(barX, midY); ctx.moveTo(barX + BAR_W, midY); ctx.lineTo(CW, midY); ctx.stroke();
+
+  for (var i = 0; i < 12; i++) {
+    var x = getPointX(i);
+    var isEven = i % 2 === 0;
+    var triH = ROW_H * 0.88;
+
+    ctx.beginPath(); ctx.moveTo(x - POINT_W/2 + 1, BOARD_PAD); ctx.lineTo(x + POINT_W/2 - 1, BOARD_PAD); ctx.lineTo(x, BOARD_PAD + triH); ctx.closePath();
+    ctx.fillStyle = isEven ? '#c4a060' : '#1e4a2e'; ctx.fill(); ctx.strokeStyle = '#2a1a0a'; ctx.lineWidth = 0.8; ctx.stroke();
+
+    ctx.beginPath(); ctx.moveTo(x - POINT_W/2 + 1, CH - BOARD_PAD); ctx.lineTo(x + POINT_W/2 - 1, CH - BOARD_PAD); ctx.lineTo(x, CH - BOARD_PAD - triH); ctx.closePath();
+    ctx.fillStyle = isEven ? '#1e4a2e' : '#c4a060'; ctx.fill(); ctx.strokeStyle = '#2a1a0a'; ctx.lineWidth = 0.8; ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = Math.max(8, POINT_W * 0.22) + 'px DM Sans';
+    ctx.textAlign = 'center';
+    ctx.fillText(topIndices[i] + 1, x, BOARD_PAD + triH + 12);
+    ctx.fillText(botIndices[i] + 1, x, CH - BOARD_PAD - triH - 5);
+  }
+
+  drawPieces(); drawValidMoves(); drawBarPieces();
+}
+
+function drawPiece(cx, cy, color, count, showCount) {
+  ctx.beginPath(); ctx.arc(cx, cy, PIECE_R, 0, Math.PI * 2);
+  if (color === 'white') {
+    var g = ctx.createRadialGradient(cx - PIECE_R*0.2, cy - PIECE_R*0.2, 1, cx, cy, PIECE_R);
+    g.addColorStop(0, '#fff'); g.addColorStop(1, '#e0ceae'); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#b89050'; ctx.lineWidth = 1.5; ctx.stroke();
+  } else {
+    var g2 = ctx.createRadialGradient(cx - PIECE_R*0.2, cy - PIECE_R*0.2, 1, cx, cy, PIECE_R);
+    g2.addColorStop(0, '#4a3828'); g2.addColorStop(1, '#1a1008'); ctx.fillStyle = g2; ctx.fill();
+    ctx.strokeStyle = '#6b5535'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  if (showCount && count > 0) {
+    ctx.fillStyle = color === 'white' ? '#5c3a1e' : '#e8c87a';
+    ctx.font = 'bold ' + Math.max(10, PIECE_R * 0.7) + 'px DM Sans';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(count, cx, cy);
+  }
+}
+
+function drawPieces() {
+  var maxShow = 5;
+  var gap = Math.min(PIECE_R * 2, ROW_H / 5.2);
+  for (var vi = 0; vi < 12; vi++) {
+    var idx = topIndices[vi]; var p = board[idx]; var x = getPointX(vi);
+    var color = p.w > 0 ? 'white' : 'black'; var count = p.w > 0 ? p.w : p.b;
+    if (count === 0) continue;
+    var show = Math.min(count, maxShow);
+    for (var j = 0; j < show; j++) drawPiece(x, BOARD_PAD + PIECE_R + j * gap, color, count, j === show - 1 && count > maxShow);
+    if (selectedPoint === idx) { ctx.strokeStyle = '#e8c87a'; ctx.lineWidth = 2.5; ctx.strokeRect(x - POINT_W/2 + 2, BOARD_PAD, POINT_W - 4, ROW_H); }
+  }
+  for (var vi = 0; vi < 12; vi++) {
+    var idx = botIndices[vi]; var p = board[idx]; var x = getPointX(vi);
+    var color = p.w > 0 ? 'white' : 'black'; var count = p.w > 0 ? p.w : p.b;
+    if (count === 0) continue;
+    var show = Math.min(count, maxShow);
+    for (var j = 0; j < show; j++) drawPiece(x, CH - BOARD_PAD - PIECE_R - j * gap, color, count, j === show - 1 && count > maxShow);
+    if (selectedPoint === idx) { ctx.strokeStyle = '#e8c87a'; ctx.lineWidth = 2.5; ctx.strokeRect(x - POINT_W/2 + 2, CH - BOARD_PAD - ROW_H, POINT_W - 4, ROW_H); }
+  }
+}
+
+function drawBarPieces() {
+  var barCX = POINT_W * 6 + BAR_W / 2;
+  var bpSize = PIECE_R * 0.85;
+  for (var i = 0; i < barBlack; i++) { ctx.beginPath(); ctx.arc(barCX, CH/2 - 20 - i*(bpSize*2+2), bpSize, 0, Math.PI*2); ctx.fillStyle = '#2a1a0a'; ctx.fill(); ctx.strokeStyle = '#6b5535'; ctx.lineWidth = 1; ctx.stroke(); }
+  for (var i = 0; i < barWhite; i++) { ctx.beginPath(); ctx.arc(barCX, CH/2 + 20 + i*(bpSize*2+2), bpSize, 0, Math.PI*2); ctx.fillStyle = '#e8d5b5'; ctx.fill(); ctx.strokeStyle = '#b89050'; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+function drawValidMoves() {
+  if (turn !== myColor || gameOver) return;
+  var validMoves = selectedPoint >= 0 ? getValidMovesLocal(selectedPoint, myColor) : ((myColor === 'w' ? barWhite : barBlack) > 0 ? getValidMovesLocal(-1, myColor) : []);
+  for (var mi = 0; mi < validMoves.length; mi++) {
+    var to = validMoves[mi].to;
+    if (to === 24 || to === -1) continue;
+    var vi = -1, isTop = false;
+    for (var i = 0; i < 12; i++) { if (topIndices[i] === to) { vi = i; isTop = true; break; } if (botIndices[i] === to) { vi = i; isTop = false; break; } }
+    if (vi < 0) continue;
+    var x = getPointX(vi);
+    var p = board[to]; var count = p.w + p.b;
+    var gap2 = Math.min(PIECE_R * 2, ROW_H / 5.2);
+    var y = isTop ? BOARD_PAD + PIECE_R + count * gap2 : CH - BOARD_PAD - PIECE_R - count * gap2;
+    ctx.beginPath(); ctx.arc(x, y, PIECE_R * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(232,200,122,0.55)'; ctx.fill();
+    ctx.strokeStyle = '#e8c87a'; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function handleCanvasClick(e) {
+  if (turn !== myColor || gameOver) return;
+  if (getAvailableDice().length === 0) return;
+
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) * (CW / rect.width);
+  var my = (e.clientY - rect.top) * (CH / rect.height);
+
+  var clickedIdx = -2;
+  for (var vi = 0; vi < 12; vi++) {
+    if (Math.abs(mx - getPointX(vi)) < POINT_W / 2) {
+      clickedIdx = my < CH / 2 ? topIndices[vi] : botIndices[vi];
+      break;
+    }
+  }
+  if (clickedIdx >= 0) clickPoint(clickedIdx);
+}
+
+function clickPoint(idx) {
+  if (turn !== myColor || gameOver) return;
+  var myBar = myColor === 'w' ? barWhite : barBlack;
+
+  if (myBar > 0) {
+    var mv = getValidMovesLocal(-1, myColor);
+    var m = null;
+    for (var i = 0; i < mv.length; i++) { if (mv[i].to === idx) { m = mv[i]; break; } }
+    if (m) { socket.emit('makeMove', { move: m }); selectedPoint = -1; }
+    return;
+  }
+
+  if (selectedPoint === idx) { selectedPoint = -1; render(); return; }
+
+  if (selectedPoint >= 0) {
+    var mv2 = getValidMovesLocal(selectedPoint, myColor);
+    var m2 = null;
+    for (var i = 0; i < mv2.length; i++) { if (mv2[i].to === idx) { m2 = mv2[i]; break; } }
+    if (m2) { socket.emit('makeMove', { move: m2 }); selectedPoint = -1; return; }
+  }
+
+  if (board[idx][myColor] > 0) { selectedPoint = idx; render(); }
+}
+
+function clickBearoff() {
+  if (turn !== myColor || gameOver || selectedPoint < 0) return;
+  var mv = getValidMovesLocal(selectedPoint, myColor);
+  var m = null;
+  for (var i = 0; i < mv.length; i++) { if (mv[i].bearoff) { m = mv[i]; break; } }
+  if (m) { socket.emit('makeMove', { move: m }); selectedPoint = -1; }
+}
+
+function msg(t) { document.getElementById('msg').textContent = t; }
+
+function render() {
+  if (document.getElementById('gameScreen').classList.contains('active')) {
+    initCanvas();
+    drawBoard();
+    document.getElementById('bo-white').textContent = offW;
+    document.getElementById('bo-black').textContent = offB;
+
+    var left = getAvailableDice();
+    var d1e = document.getElementById('die1');
+    var d2e = document.getElementById('die2');
+    if (dice.length > 0) {
+      var aD = dice.length === 4 ? [dice[0], dice[0]] : dice;
+      d1e.classList.toggle('used', !left.some(function(x){return x===aD[0];})||(dice.length===4&&usedDice.length>=2&&left.filter(function(x){return x===aD[0];}).length<2));
+      d2e.classList.toggle('used', left.length===0||(dice.length===2&&usedDice.length>=1&&!left.some(function(x){return x===aD[1];})));
+    }
+
+    // Update pips and active
+    document.getElementById('p-white').classList.toggle('active', turn === 'w');
+    document.getElementById('p-black').classList.toggle('active', turn === 'b');
+    var pipW = 0, pipB = 0;
+    for (var i = 0; i < 24; i++) { pipW += board[i].w * (24 - i); pipB += board[i].b * (i + 1); }
+    pipW += barWhite * 25; pipB += barBlack * 25;
+    document.getElementById('pip-white').textContent = '(' + pipW + ')';
+    document.getElementById('pip-black').textContent = '(' + pipB + ')';
+  }
+}
+
+window.addEventListener('resize', function() { render(); });
+</script>
+</body>
+</html>
